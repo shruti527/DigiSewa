@@ -11,6 +11,8 @@ import ApplicationForm from "./pages/ApplicationForm";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import NotFound from "./pages/NotFound";
+import HelpSupport from "./pages/HelpSupport";
+
 
 const queryClient = new QueryClient();
 
@@ -30,6 +32,8 @@ const App = () => (
           <Route path="/applications" element={<Dashboard />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/track" element={<TrackApplication />} />
+          <Route path="/help-support" element={<HelpSupport />} /> 
+          
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
