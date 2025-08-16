@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -50,11 +49,11 @@ const Services = () => {
     },
     {
       id: "vehicle-registration",
-      title: "New Vehicle Registration",
+      title: "New Vehicle Registration", 
       description: "Register your new vehicle and get RC book with digital certificate",
-      category: "vehicle", 
+      category: "vehicle",
       icon: Car,
-      processingTime: "1-2 Days",
+      processingTime: "1-2 Days", 
       fees: "₹300 - ₹1500",
       rating: 4.9,
       documents: ["Invoice", "Insurance", "PUC Certificate"],
@@ -119,8 +118,6 @@ const Services = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
-      
       <main className="pt-8 pb-20">
         <div className="container mx-auto px-4">
           {/* Header */}
@@ -218,9 +215,9 @@ const Services = () => {
                       </div>
                     </div>
                     
-                    <Button className="w-full" variant="government" asChild>
+                    <Button className="w-full" variant="default" asChild>
                       <Link to={`/apply/${service.id}`}>
-                        Apply Now
+                        Explore {service.title}
                         <ArrowRight className="ml-2 h-4 w-4" />
                       </Link>
                     </Button>

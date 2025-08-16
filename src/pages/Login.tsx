@@ -4,12 +4,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Shield, User, Mail, Lock, ArrowRight } from "lucide-react";
+import { Shield, User, ArrowRight } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { useToast } from "@/hooks/use-toast";
-import { API_BASE_URL } from "@/integrations/supabase/client"; // points to your Mongo backend
+import { API_BASE_URL } from "@/integrations/supabase/client";
 
 const Login = () => {
   const [userForm, setUserForm] = useState({ email: "", password: "" });
@@ -32,9 +31,23 @@ const Login = () => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Login failed");
 
-      localStorage.setItem("token", data.token);
+      if (data.token) localStorage.setItem("token", data.token);
 
-      toast({ title: "Login Successful", description: "Welcome back!" });
+      const fullName =
+        data.fullName ||
+        data.name ||
+        (data.user && (data.user.fullName || data.user.name)) ||
+        null;
+
+      if (fullName) {
+        localStorage.setItem("fullName", fullName);
+      } else if (data.email) {
+        localStorage.setItem("email", data.email);
+      } else {
+        localStorage.setItem("email", userForm.email);
+      }
+
+      toast({ title: "Login Successful", description: `Welcome back ${fullName || userForm.email}!` });
       navigate("/dashboard");
     } catch (err: any) {
       toast({ title: "Login Failed", description: err.message, variant: "destructive" });
@@ -57,7 +70,10 @@ const Login = () => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Admin login failed");
 
-      localStorage.setItem("token", data.token);
+      if (data.token) localStorage.setItem("token", data.token);
+
+      const adminName = data.fullName || data.name || (data.user && (data.user.fullName || data.user.name)) || "Admin";
+      localStorage.setItem("fullName", adminName);
 
       toast({ title: "Admin Login Successful", description: "Access granted" });
       navigate("/admin/dashboard");
@@ -70,7 +86,6 @@ const Login = () => {
 
   return (
     <div className="min-h-screen bg-gradient-subtle">
-      <Header />
       <main className="container mx-auto px-4 pt-24 pb-16">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-12">

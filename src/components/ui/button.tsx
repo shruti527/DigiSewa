@@ -1,7 +1,6 @@
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { cva, type VariantProps } from "class-variance-authority"
-
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
@@ -9,18 +8,22 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary-dark hover:shadow-government transform hover:scale-105",
+        default:
+          "bg-[#1E88E5] text-white hover:bg-[#1565C0] hover:shadow-lg transform hover:scale-105", // Blue button
         destructive:
-          "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+          "bg-[#E53935] text-white hover:bg-[#C62828]", // Red button
         outline:
-          "border border-primary text-primary bg-background hover:bg-primary hover:text-primary-foreground",
+          "border border-[#1E88E5] text-[#1E88E5] bg-white hover:bg-[#1E88E5] hover:text-white", // Blue outline
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80 hover:shadow-card-soft",
-        ghost: "hover:bg-accent/10 hover:text-accent",
-        link: "text-primary underline-offset-4 hover:underline",
-        government: "bg-gradient-government text-white hover:shadow-elevated transform hover:scale-105",
-        success: "bg-success text-success-foreground hover:bg-success/90",
-        warning: "bg-warning text-warning-foreground hover:bg-warning/90",
+          "bg-gray-500 text-white hover:bg-gray-600", // 🔹 Changed from brown to neutral gray
+        ghost: "hover:bg-gray-100 hover:text-gray-900", // Subtle ghost
+        link: "text-[#1E88E5] underline-offset-4 hover:underline", // Blue link
+        government:
+          "bg-gradient-to-r from-[#1565C0] to-[#1E88E5] text-white hover:shadow-lg transform hover:scale-105", // Blue gradient
+        success:
+          "bg-[#43A047] text-white hover:bg-[#2E7D32]", // Green
+        warning:
+          "bg-[#FDD835] text-black hover:bg-[#FBC02D]", // Yellow
       },
       size: {
         default: "h-10 px-4 py-2",
