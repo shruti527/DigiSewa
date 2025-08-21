@@ -1,21 +1,32 @@
-const jwt = require("jsonwebtoken");
+// middleware/auth.js
+const jwt = require('jsonwebtoken');
+const User = require('../models/User');
 
-module.exports = function auth(requiredRole) {
-  return function (req, res, next) {
+module.exports = function() {
+  return async (req, res, next) => {
     try {
-      const header = req.headers.authorization || "";
-      const token = header.startsWith("Bearer ") ? header.slice(7) : null;
-      if (!token) return res.status(401).json({ message: "Missing token" });
-
-      const payload = jwt.verify(token, process.env.JWT_SECRET);
-      req.user = payload;
-
-      if (requiredRole && payload.role !== requiredRole) {
-        return res.status(403).json({ message: "Forbidden" });
+      // Get token from header
+      const token = req.header('Authorization')?.replace('Bearer ', '');
+      
+      if (!token) {
+        return res.status(401).json({ message: 'No token, authorization denied' });
       }
+
+      // Verify token
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      
+      // Get user from database
+      const user = await User.findById(decoded.id);
+      if (!user) {
+        return res.status(401).json({ message: 'Token is not valid' });
+      }
+
+      // Attach user to request
+      req.user = user;
       next();
     } catch (err) {
-      return res.status(401).json({ message: "Invalid or expired token" });
+      console.error('Auth middleware error:', err);
+      res.status(401).json({ message: 'Token is not valid' });
     }
   };
 };

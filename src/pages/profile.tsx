@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   User,
   Mail,
@@ -20,67 +21,223 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
+interface UserData {
+  fullName: string;
+  email: string;
+  phone: string;
+  address: string;
+  dob: string;
+  governmentId: string;
+  isVerified?: boolean;
+}
+
 const Profile = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
-  const [userData, setUserData] = useState({
-    fullName: "",
-    email: "",
-    phone: "",
-    address: "",
-    dob: "",
-    governmentId: "",
+  const [isLoading, setIsLoading] = useState(true);
+  const [lastFetchTime, setLastFetchTime] = useState(0);
+  const [userData, setUserData] = useState<UserData | null>(() => {
+    const savedName = localStorage.getItem("fullName");
+    const savedEmail = localStorage.getItem("email");
+    return savedName || savedEmail ? {
+      fullName: savedName || "",
+      email: savedEmail || "",
+      phone: "",
+      address: "",
+      dob: "",
+      governmentId: "",
+      isVerified: false,
+    } : null;
   });
 
-  // Fetch user data on mount
   useEffect(() => {
     const fetchProfile = async () => {
       const token = localStorage.getItem("token");
-      if (!token) return navigate("/login");
+      if (!token) {
+        navigate("/login");
+        return;
+      }
 
+      if (Date.now() - lastFetchTime < 30000 && userData) {
+        setIsLoading(false);
+        return;
+      }
+
+      setIsLoading(true);
       try {
-        const res = await fetch("/api/profile", {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/profile`, {
           headers: { Authorization: `Bearer ${token}` },
+          signal: controller.signal
         });
-        if (res.ok) {
-          const data = await res.json();
-          setUserData({
-            fullName: data.fullName || localStorage.getItem("fullName") || "",
-            email: data.email || localStorage.getItem("email") || "",
-            phone: data.phone || "",
-            address: data.address || "",
-            dob: data.dob || "",
-            governmentId: data.governmentId || "",
+        
+        clearTimeout(timeoutId);
+
+        if (!res.ok) throw new Error(res.statusText);
+
+        const data = await res.json();
+        setUserData({
+          fullName: data.fullName || "",
+          email: data.email || "",
+          phone: data.phone || "",
+          address: data.address || "",
+          dob: data.dob ? data.dob.split('T')[0] : "",
+          governmentId: data.governmentId || "",
+          isVerified: data.isVerified || false,
+        });
+        
+        localStorage.setItem("fullName", data.fullName || "");
+        localStorage.setItem("email", data.email || "");
+        setLastFetchTime(Date.now());
+      } catch (error) {
+        if (error.name !== 'AbortError') {
+          toast({
+            title: "Error",
+            description: "Failed to fetch profile data",
+            variant: "destructive",
           });
         }
-      } catch (error) {
-        toast({
-          title: "Error",
-          description: "Failed to fetch profile data",
-          variant: "destructive",
-        });
+      } finally {
+        setIsLoading(false);
       }
     };
 
     fetchProfile();
-  }, []);
+  }, [navigate, toast, lastFetchTime]);
 
-  const handleSave = () => {
-    // Simulate API call
-    toast({
-      title: "Success",
-      description: "Profile updated successfully",
-    });
-    setIsEditing(false);
-    // Update localStorage
-    localStorage.setItem("fullName", userData.fullName);
+  const handleSave = async () => {
+    if (!userData) return;
+    
+    const token = localStorage.getItem("token");
+    if (!token) {
+      navigate("/login");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/profile`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          fullName: userData.fullName,
+          phone: userData.phone,
+          address: userData.address,
+          dob: userData.dob,
+        }),
+      });
+
+      if (!res.ok) throw new Error(res.statusText);
+
+      const data = await res.json();
+      setUserData(prev => ({
+        ...prev!,
+        fullName: data.fullName,
+        phone: data.phone,
+        address: data.address,
+        dob: data.dob ? data.dob.split('T')[0] : "",
+      }));
+
+      toast({
+        title: "Success",
+        description: "Profile updated successfully",
+      });
+      setIsEditing(false);
+      localStorage.setItem("fullName", data.fullName || "");
+      setLastFetchTime(Date.now());
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update profile",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setUserData((prev) => ({ ...prev, [name]: value }));
+    setUserData((prev) => ({ ...prev!, [name]: value }));
   };
+
+  if (isLoading && !userData) {
+    return (
+      <div className="min-h-screen bg-background">
+        <main className="pt-8 pb-20">
+          <div className="container mx-auto px-4">
+            <div className="mb-8 flex justify-between items-center">
+              <Skeleton className="h-9 w-48" />
+              <Skeleton className="h-10 w-32" />
+            </div>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <Card className="lg:col-span-2">
+                <CardContent className="p-6 space-y-6">
+                  <div className="flex items-center">
+                    <Skeleton className="h-6 w-6 mr-2" />
+                    <Skeleton className="h-6 w-48" />
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {[...Array(5)].map((_, i) => (
+                      <div key={i}>
+                        <Skeleton className="h-4 w-20 mb-2" />
+                        <Skeleton className="h-9 w-full" />
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardContent className="p-6 space-y-6">
+                  <div className="flex items-center">
+                    <Skeleton className="h-6 w-6 mr-2" />
+                    <Skeleton className="h-6 w-48" />
+                  </div>
+                  
+                  <div>
+                    <Skeleton className="h-4 w-32 mb-2" />
+                    <Skeleton className="h-4 w-full" />
+                  </div>
+                  
+                  <div>
+                    <Skeleton className="h-4 w-32 mb-2" />
+                    <Skeleton className="h-6 w-24" />
+                  </div>
+                  
+                  <div className="pt-4">
+                    <Skeleton className="h-10 w-full" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (!userData) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <p>Unable to load profile data</p>
+          <Button onClick={() => window.location.reload()} className="mt-4">
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -90,11 +247,16 @@ const Profile = () => {
             <h1 className="text-3xl font-bold">My Profile</h1>
             {isEditing ? (
               <div className="space-x-2">
-                <Button variant="outline" onClick={() => setIsEditing(false)}>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsEditing(false)}
+                  disabled={isLoading}
+                >
                   <X className="mr-2 h-4 w-4" /> Cancel
                 </Button>
-                <Button onClick={handleSave}>
-                  <Save className="mr-2 h-4 w-4" /> Save Changes
+                <Button onClick={handleSave} disabled={isLoading}>
+                  <Save className="mr-2 h-4 w-4" /> 
+                  {isLoading ? "Saving..." : "Save Changes"}
                 </Button>
               </div>
             ) : (
@@ -105,7 +267,6 @@ const Profile = () => {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Personal Info Card */}
             <Card className="lg:col-span-2">
               <CardContent className="p-6 space-y-6">
                 <h2 className="text-xl font-semibold flex items-center">
@@ -121,6 +282,7 @@ const Profile = () => {
                         name="fullName"
                         value={userData.fullName}
                         onChange={handleInputChange}
+                        disabled={isLoading}
                       />
                     ) : (
                       <p className="text-sm mt-1">{userData.fullName}</p>
@@ -129,20 +291,9 @@ const Profile = () => {
 
                   <div>
                     <Label htmlFor="email">Email</Label>
-                    {isEditing ? (
-                      <Input
-                        id="email"
-                        name="email"
-                        type="email"
-                        value={userData.email}
-                        onChange={handleInputChange}
-                        disabled // Email often non-editable
-                      />
-                    ) : (
-                      <p className="text-sm mt-1 flex items-center">
-                        <Mail className="mr-2 h-4 w-4" /> {userData.email}
-                      </p>
-                    )}
+                    <p className="text-sm mt-1 flex items-center">
+                      <Mail className="mr-2 h-4 w-4" /> {userData.email}
+                    </p>
                   </div>
 
                   <div>
@@ -153,6 +304,7 @@ const Profile = () => {
                         name="phone"
                         value={userData.phone}
                         onChange={handleInputChange}
+                        disabled={isLoading}
                       />
                     ) : (
                       <p className="text-sm mt-1 flex items-center">
@@ -171,6 +323,7 @@ const Profile = () => {
                         type="date"
                         value={userData.dob}
                         onChange={handleInputChange}
+                        disabled={isLoading}
                       />
                     ) : (
                       <p className="text-sm mt-1 flex items-center">
@@ -188,6 +341,7 @@ const Profile = () => {
                         name="address"
                         value={userData.address}
                         onChange={handleInputChange}
+                        disabled={isLoading}
                       />
                     ) : (
                       <p className="text-sm mt-1 flex items-center">
@@ -200,7 +354,6 @@ const Profile = () => {
               </CardContent>
             </Card>
 
-            {/* Government ID & Verification */}
             <Card>
               <CardContent className="p-6 space-y-6">
                 <h2 className="text-xl font-semibold flex items-center">
@@ -217,8 +370,11 @@ const Profile = () => {
 
                 <div>
                   <Label>Verification Status</Label>
-                  <Badge className="mt-1 bg-success text-success-foreground">
-                    Verified
+                  <Badge 
+                    className="mt-1" 
+                    variant={userData.isVerified ? "default" : "secondary"}
+                  >
+                    {userData.isVerified ? "Verified" : "Not Verified"}
                   </Badge>
                 </div>
 
@@ -231,7 +387,6 @@ const Profile = () => {
             </Card>
           </div>
 
-          {/* Documents Section */}
           <div className="mt-6">
             <Card>
               <CardContent className="p-6">
@@ -241,7 +396,6 @@ const Profile = () => {
                     <FileText className="mr-2 h-5 w-5" />
                     Upload New Document
                   </Button>
-                  {/* Placeholder for user documents */}
                 </div>
               </CardContent>
             </Card>

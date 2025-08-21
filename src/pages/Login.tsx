@@ -5,17 +5,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Shield, User, ArrowRight } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Footer } from "@/components/Footer";
 import { useToast } from "@/hooks/use-toast";
 import { API_BASE_URL } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Login = () => {
   const [userForm, setUserForm] = useState({ email: "", password: "" });
   const [adminForm, setAdminForm] = useState({ email: "", password: "", adminCode: "" });
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
+  const { login } = useAuth();
 
   const handleUserLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,29 +31,40 @@ const Login = () => {
         body: JSON.stringify(userForm),
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Login failed");
-
-      if (data.token) localStorage.setItem("token", data.token);
-
-      const fullName =
-        data.fullName ||
-        data.name ||
-        (data.user && (data.user.fullName || data.user.name)) ||
-        null;
-
-      if (fullName) {
-        localStorage.setItem("fullName", fullName);
-      } else if (data.email) {
-        localStorage.setItem("email", data.email);
-      } else {
-        localStorage.setItem("email", userForm.email);
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Login failed");
       }
 
-      toast({ title: "Login Successful", description: `Welcome back ${fullName || userForm.email}!` });
-      navigate("/dashboard");
+      const data = await res.json();
+      
+      // Store token in httpOnly cookie instead of localStorage
+      document.cookie = `token=${data.token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Strict; Secure`;
+      
+      // Call context login function
+      login(data.token, {
+        id: data.user?.id || '',
+        name: data.user?.name || data.user?.fullName || userForm.email,
+        email: data.user?.email || userForm.email,
+        role: 'citizen'
+      });
+
+      toast({
+        title: "Login Successful", 
+        description: `Welcome back ${data.user?.name || data.user?.fullName || userForm.email}!`,
+        duration: 2000
+      });
+      
+      // Redirect to intended page or dashboard
+      const from = location.state?.from?.pathname || "/dashboard";
+      navigate(from, { replace: true });
     } catch (err: any) {
-      toast({ title: "Login Failed", description: err.message, variant: "destructive" });
+      toast({ 
+        title: "Login Failed", 
+        description: err.message, 
+        variant: "destructive",
+        duration: 3000
+      });
     } finally {
       setIsLoading(false);
     }
@@ -67,18 +81,37 @@ const Login = () => {
         body: JSON.stringify(adminForm),
       });
 
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Admin login failed");
+      }
+
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Admin login failed");
+      
+      // Store token in httpOnly cookie
+      document.cookie = `token=${data.token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Strict; Secure`;
+      
+      login(data.token, {
+        id: data.user?.id || '',
+        name: data.user?.name || data.user?.fullName || "Admin",
+        email: data.user?.email || adminForm.email,
+        role: 'admin'
+      });
 
-      if (data.token) localStorage.setItem("token", data.token);
-
-      const adminName = data.fullName || data.name || (data.user && (data.user.fullName || data.user.name)) || "Admin";
-      localStorage.setItem("fullName", adminName);
-
-      toast({ title: "Admin Login Successful", description: "Access granted" });
-      navigate("/admin/dashboard");
+      toast({ 
+        title: "Admin Login Successful", 
+        description: "Access granted",
+        duration: 2000
+      });
+      
+      navigate("/admin/dashboard", { replace: true });
     } catch (err: any) {
-      toast({ title: "Admin Login Failed", description: err.message, variant: "destructive" });
+      toast({ 
+        title: "Admin Login Failed", 
+        description: err.message, 
+        variant: "destructive",
+        duration: 3000
+      });
     } finally {
       setIsLoading(false);
     }
@@ -105,7 +138,6 @@ const Login = () => {
               </TabsTrigger>
             </TabsList>
 
-            {/* Citizen Login */}
             <TabsContent value="user">
               <Card className="shadow-corporate">
                 <CardHeader>
@@ -124,6 +156,7 @@ const Login = () => {
                         value={userForm.email}
                         onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
                         required
+                        disabled={isLoading}
                       />
                     </div>
                     <div>
@@ -134,9 +167,14 @@ const Login = () => {
                         value={userForm.password}
                         onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
                         required
+                        disabled={isLoading}
                       />
                     </div>
-                    <Button type="submit" className="w-full" disabled={isLoading}>
+                    <Button 
+                      type="submit" 
+                      className="w-full" 
+                      disabled={isLoading}
+                    >
                       {isLoading ? "Signing in..." : "Login to Services"}
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </Button>
@@ -153,7 +191,6 @@ const Login = () => {
               </Card>
             </TabsContent>
 
-            {/* Admin Login */}
             <TabsContent value="admin">
               <Card className="shadow-corporate border-accent/20">
                 <CardHeader>
@@ -170,6 +207,7 @@ const Login = () => {
                       value={adminForm.email}
                       onChange={(e) => setAdminForm({ ...adminForm, email: e.target.value })}
                       required
+                      disabled={isLoading}
                     />
                     <Input
                       type="password"
@@ -177,6 +215,7 @@ const Login = () => {
                       value={adminForm.password}
                       onChange={(e) => setAdminForm({ ...adminForm, password: e.target.value })}
                       required
+                      disabled={isLoading}
                     />
                     <Input
                       type="password"
@@ -184,8 +223,13 @@ const Login = () => {
                       value={adminForm.adminCode}
                       onChange={(e) => setAdminForm({ ...adminForm, adminCode: e.target.value })}
                       required
+                      disabled={isLoading}
                     />
-                    <Button type="submit" className="w-full bg-accent hover:bg-accent/90" disabled={isLoading}>
+                    <Button 
+                      type="submit" 
+                      className="w-full bg-accent hover:bg-accent/90" 
+                      disabled={isLoading}
+                    >
                       {isLoading ? "Verifying..." : "Access Admin Portal"}
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </Button>

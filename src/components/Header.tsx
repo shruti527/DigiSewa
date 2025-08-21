@@ -1,32 +1,23 @@
 // src/components/Header.tsx
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Menu, User, Bell, LogOut } from "lucide-react";
+import { Menu, Bell, LogOut } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import governmentLogo from "@/assets/government-logo.png";
+import { useAuth } from "@/contexts/AuthContext";
 
-interface HeaderProps {
-  userRole?: "citizen" | "officer" | "admin";
-}
-
-export const Header = ({ userRole = "citizen" }: HeaderProps) => {
+export const Header = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
 
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-
-  // ✅ Check login state on mount
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    setIsAuthenticated(!!token && token !== "null" && token !== "undefined");
-  }, [location]); // refresh when route changes
-
+  // Navigation items for each role
   const navItems = [
     { href: "/", label: "Home" },
     { href: "/services", label: "Services" },
-    ...(isAuthenticated ? [{ href: "/applications", label: "My Applications" }] : []),
-    ...(isAuthenticated ? [{ href: "/track", label: "Track Application" }] : []),
+    ...(user ? [{ href: "/applications", label: "My Applications" }] : []),
+    ...(user ? [{ href: "/track", label: "Track Application" }] : []),
     { href: "/help", label: "Help & Support" },
   ];
 
@@ -43,13 +34,15 @@ export const Header = ({ userRole = "citizen" }: HeaderProps) => {
     { href: "/officer/approvals", label: "Approvals" },
   ];
 
-  const currentNavItems =
-    userRole === "admin" ? adminNavItems : userRole === "officer" ? officerNavItems : navItems;
+  const currentNavItems = user?.role === "admin" 
+    ? adminNavItems 
+    : user?.role === "officer" 
+      ? officerNavItems 
+      : navItems;
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    setIsAuthenticated(false);
-    navigate("/"); // ✅ redirect to Home instead of login
+    logout();
+    navigate("/");
   };
 
   const handleProfile = () => navigate("/profile");
@@ -84,19 +77,18 @@ export const Header = ({ userRole = "citizen" }: HeaderProps) => {
           ))}
         </nav>
 
-        {/* Right side */}
+        {/* Right side actions */}
         <div className="ml-auto flex items-center space-x-4">
-          {isAuthenticated ? (
+          {user ? (
             <>
               <Button variant="ghost" size="sm" onClick={handleNotifications}>
                 <Bell className="h-4 w-4" />
               </Button>
               <Button variant="ghost" size="sm" onClick={handleProfile}>
-                <User className="h-4 w-4" />
-                Profile
+                <span className="mr-2">{user.name}</span>
               </Button>
               <Button variant="outline" size="sm" onClick={handleLogout}>
-                <LogOut className="h-4 w-4" />
+                <LogOut className="h-4 w-4 mr-2" />
                 Logout
               </Button>
             </>
@@ -139,5 +131,3 @@ export const Header = ({ userRole = "citizen" }: HeaderProps) => {
     </header>
   );
 };
-
-export default Header;

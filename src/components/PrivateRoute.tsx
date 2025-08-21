@@ -1,33 +1,23 @@
 // src/components/PrivateRoute.tsx
 import { Navigate, useLocation } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
-function getValidToken(): string | null {
-  const token = localStorage.getItem("token");
-  if (!token) return null;
-  const trimmed = token.trim();
-  if (!trimmed || trimmed === "null" || trimmed === "undefined") return null;
-
-  // If it's a JWT, optionally verify expiry
-  const parts = trimmed.split(".");
-  if (parts.length === 3) {
-    try {
-      const payload = JSON.parse(atob(parts[1]));
-      if (payload?.exp && Date.now() >= payload.exp * 1000) return null; // expired
-    } catch {
-      // If payload can't be parsed, treat as invalid
-      return null;
-    }
-  }
-
-  return trimmed;
+interface PrivateRouteProps {
+  children: JSX.Element;
+  requiredRole?: 'citizen' | 'officer' | 'admin';
 }
 
-export default function PrivateRoute({ children }: { children: JSX.Element }) {
+export default function PrivateRoute({ children, requiredRole }: PrivateRouteProps) {
   const location = useLocation();
-  const token = getValidToken();
+  const { user } = useAuth();
 
-  if (!token) {
+  if (!user) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
+
+  if (requiredRole && user.role !== requiredRole) {
+    return <Navigate to="/" replace />;
+  }
+
   return children;
 }

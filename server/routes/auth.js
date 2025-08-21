@@ -1,15 +1,21 @@
+// routes/auth.js
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
-const auth = require("../middleware/auth");
+const authMiddleware = require("../middleware/auth");
 
 const router = express.Router();
 
 // helper to sign JWT
 function signToken(user) {
   return jwt.sign(
-    { id: user._id, email: user.email, role: user.role, name: user.name },
+    { 
+      id: user._id, 
+      email: user.email, 
+      role: user.role, 
+      name: user.name 
+    },
     process.env.JWT_SECRET,
     { expiresIn: "7d" }
   );
@@ -42,7 +48,12 @@ router.post("/register", async (req, res) => {
 
     return res.status(201).json({
       message: "Registered successfully",
-      user: { id: user._id, name: user.name, email: user.email, role: user.role },
+      user: { 
+        id: user._id, 
+        name: user.name, 
+        email: user.email, 
+        role: user.role 
+      },
     });
   } catch (err) {
     console.error("register error:", err);
@@ -58,17 +69,31 @@ router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password are required" });
+    }
+
     const user = await User.findOne({ email });
     if (!user) return res.status(401).json({ message: "Invalid email or password" });
 
-    const ok = await bcrypt.compare(password, user.passwordHash);
-    if (!ok) return res.status(401).json({ message: "Invalid email or password" });
+    if (!user.passwordHash) {
+      console.error("User password hash missing for:", email);
+      return res.status(500).json({ message: "Server configuration error" });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.passwordHash);
+    if (!isMatch) return res.status(401).json({ message: "Invalid email or password" });
 
     const token = signToken(user);
     return res.json({
       message: "Login successful",
       token,
-      user: { id: user._id, name: user.name, email: user.email, role: user.role },
+      user: { 
+        id: user._id, 
+        name: user.name, 
+        email: user.email, 
+        role: user.role 
+      },
     });
   } catch (err) {
     console.error("login error:", err);
@@ -79,7 +104,6 @@ router.post("/login", async (req, res) => {
 /**
  * POST /api/auth/admin-login
  * body: { email, password, adminCode }
- * - OPTIONAL: require an ADMIN_CODE from .env
  */
 router.post("/admin-login", async (req, res) => {
   try {
@@ -93,10 +117,9 @@ router.post("/admin-login", async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) return res.status(401).json({ message: "Invalid email or password" });
 
-    const ok = await bcrypt.compare(password, user.passwordHash);
-    if (!ok) return res.status(401).json({ message: "Invalid email or password" });
+    const isMatch = await bcrypt.compare(password, user.passwordHash);
+    if (!isMatch) return res.status(401).json({ message: "Invalid email or password" });
 
-    // ensure role
     if (user.role !== "admin") {
       return res.status(403).json({ message: "Not an admin account" });
     }
@@ -105,7 +128,12 @@ router.post("/admin-login", async (req, res) => {
     return res.json({
       message: "Admin login successful",
       token,
-      user: { id: user._id, name: user.name, email: user.email, role: user.role },
+      user: { 
+        id: user._id, 
+        name: user.name, 
+        email: user.email, 
+        role: user.role 
+      },
     });
   } catch (err) {
     console.error("admin-login error:", err);
@@ -117,9 +145,20 @@ router.post("/admin-login", async (req, res) => {
  * GET /api/auth/me
  * header: Authorization: Bearer <token>
  */
-router.get("/me", auth(), async (req, res) => {
-  const user = await User.findById(req.user.id).select("name email role createdAt");
-  return res.json({ user });
+router.get("/me", authMiddleware(), async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id)
+      .select("name email role createdAt");
+      
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    
+    return res.json({ user });
+  } catch (err) {
+    console.error("me error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
 });
 
 module.exports = router;
